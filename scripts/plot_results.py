@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-VARIANT_ORDER = ["backbone", "+DANN", "+cGAN", "+PGD", "full"]
+VARIANT_ORDER = ["backbone", "+DANN", "+cGAN", "+PGD", "full", "advsoli"]
 GESTURES = ["pinch_idx", "pinch_pky", "fin_slid", "fin_rub",
             "slow_sw", "fast_sw", "push", "pull",
             "palm_tilt", "circle", "palm_hold"]
@@ -93,14 +93,18 @@ def main():
         best = max(log, key=lambda r: r["test_acc"])
         return best.get("per_class")
 
+    # prefer advsoli (cGAN+PGD) as the headline unified model;
+    # fall back to "full" if it's not run yet
     pc_back = per_class_for("backbone")
-    pc_full = per_class_for("full")
+    headline = "advsoli" if per_class_for("advsoli") is not None else "full"
+    pc_full = per_class_for(headline)
     if pc_back is not None and pc_full is not None:
         x = np.arange(len(GESTURES))
         w = 0.4
         fig, ax = plt.subplots(figsize=(7.0, 3.2))
+        label_full = "AdvSoli (cGAN+PGD)" if headline == "advsoli" else "full (cGAN+DANN+PGD)"
         ax.bar(x - w/2, pc_back, w, label="backbone", color="#888")
-        ax.bar(x + w/2, pc_full, w, label="full (AdvSoli)", color="#2c7fb8")
+        ax.bar(x + w/2, pc_full, w, label=label_full, color="#2c7fb8")
         for fi in FINE_IDX:
             ax.axvspan(fi - 0.5, fi + 0.5, color="#fdae6b", alpha=0.18, zorder=0)
         ax.set_xticks(x); ax.set_xticklabels(GESTURES, rotation=35, ha="right",
