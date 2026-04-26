@@ -25,8 +25,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, help="folder with .h5 files")
     ap.add_argument("--out", default="configs/splits.json")
+    # the canonical 10-subject cross-user set from the Soli paper.
+    # the dsp folder also ships sessions 0,1,4,7 (single user with repeats)
+    # and 14,15 (extras / odd labels) which we drop here.
+    ap.add_argument("--sessions",
+                    default="2,3,5,6,8,9,10,11,12,13",
+                    help="comma-separated session ids to include "
+                         "(default = the 10 canonical subjects)")
     args = ap.parse_args()
 
+    keep_sessions = {int(x) for x in args.sessions.split(",") if x.strip() != ""}
     files = sorted(glob.glob(os.path.join(args.root, "*.h5")))
     if not files:
         print(f"no .h5 found in {args.root}", file=sys.stderr)
@@ -34,15 +42,20 @@ def main():
 
     sessions = set()
     parsed = []
+    skipped = 0
     for f in files:
         p = parse_session(f)
         if p is None:
+            continue
+        if p[1] not in keep_sessions:
+            skipped += 1
             continue
         parsed.append((f, p))
         sessions.add(p[1])
 
     sessions = sorted(sessions)
-    print(f"found {len(parsed)} files across {len(sessions)} sessions: {sessions}")
+    print(f"keeping {len(parsed)} files across {len(sessions)} sessions: {sessions}"
+          f"  ({skipped} files skipped from out-of-set sessions)")
 
     # map each session id -> subject index 0..N-1
     sess2subj = {s: i for i, s in enumerate(sessions)}

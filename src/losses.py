@@ -22,9 +22,11 @@ def bce_with_logits(pred, target):
     return (torch.clamp(z, min=0) - z * t + torch.log1p(torch.exp(-z.abs()))).mean()
 
 
-def gan_d_loss(d_real_logit, d_fake_logit):
-    # standard non-saturating GAN: real -> 1, fake -> 0
-    real_t = torch.ones_like(d_real_logit)
+def gan_d_loss(d_real_logit, d_fake_logit, label_smooth=0.0):
+    # standard non-saturating GAN: real -> 1, fake -> 0.
+    # label_smooth pulls the real target down a bit (Salimans 16) which
+    # makes D less overconfident and helps the generator learn.
+    real_t = torch.full_like(d_real_logit, 1.0 - label_smooth)
     fake_t = torch.zeros_like(d_fake_logit)
     return 0.5 * (bce_with_logits(d_real_logit, real_t) +
                   bce_with_logits(d_fake_logit, fake_t))

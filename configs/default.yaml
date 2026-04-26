@@ -8,6 +8,7 @@ data:
   seq_len: 32           # pad/truncate to this many frames
   channels: [0, 1, 2, 3]   # all 4 radar channels
   img_size: 32
+  in_memory: true       # cache all clips in RAM (~300MB), saves disk IO each epoch
 
 split:
   fold: 0               # 0 or 1 for 2-fold CV
@@ -15,12 +16,14 @@ split:
 
 train:
   batch_size: 16
-  epochs: 60
+  epochs: 30            # converges fast; 30 is enough on Soli
   lr: 0.0003
   weight_decay: 0.0001
   optimizer: adam
   device: auto          # auto = mps if available else cpu
   seed: 7
+  d_step_every: 2       # update discriminator every k batches (GAN balancing)
+  label_smooth: 0.1     # smooth real labels for D (Salimans 16)
 
 # loss weights, set 0 to ablate a component
 loss:
@@ -32,7 +35,7 @@ loss:
 adversarial:
   pgd_eps: 0.03
   pgd_alpha: 0.01
-  pgd_iters: 3
+  pgd_iters: 2          # 2 iters is plenty; 3 was wasteful
   fine_grained_classes: [0, 1, 2, 3]   # pinch idx, pinch pinky, finger slider, finger rub
 
 model:

@@ -37,9 +37,11 @@ def make_loaders(cfg, fold, splits_path, use_synth):
                                 num_subjects=cfg['data']['num_subjects'], seed=99)
     else:
         tr_sess, te_sess, sess2subj = load_split(splits_path, fold)
+        in_mem = bool(cfg['data'].get('in_memory', False))
         common = dict(seq_len=cfg['data']['seq_len'],
                       channels=tuple(cfg['data']['channels']),
-                      sess2subj=sess2subj, normalize=True)
+                      sess2subj=sess2subj, normalize=True,
+                      in_memory=in_mem)
         train_ds = SoliDataset(cfg['data']['root'], tr_sess, **common)
         test_ds  = SoliDataset(cfg['data']['root'], te_sess, **common)
     bs = cfg['train']['batch_size']
@@ -119,6 +121,8 @@ def train_one_fold(cfg, fold, args):
     n_iters_total = max(1, epochs * len(train_dl))
     step = 0
     gan_warmup = max(1, epochs // 6)   # don't use fakes for cls until G is warm
+    d_step_every = int(cfg['train'].get('d_step_every', 1))
+    label_smooth = float(cfg['train'].get('label_smooth', 0.0))
 
     for ep in range(epochs):
         enc.train(); cls.train(); subj.train(); gen.train(); disc.train()
@@ -169,8 +173,8 @@ def train_one_fold(cfg, fold, args):
             opt_main.step()
             m_cls.add(L_cls_v)
 
-            # ---- discriminator update ----
-            if use_gan:
+            # ---- discriminator update (every d_step_every batches) ----
+            if use_gan and (step % d_step_every == 0):
                 opt_d.zero_grad()
                 z = torch.randn(B, cfg['model']['noise_dim'], device=device)
                 y_fake = sample_fine_labels(B, fine, device)
@@ -180,7 +184,7 @@ def train_one_fold(cfg, fold, args):
                 # otherwise use the whole batch (just label-conditioned)
                 d_real = disc(x, y)
                 d_fake = disc(x_fake, y_fake)
-                Ld = gan_d_loss(d_real, d_fake)
+                Ld = gan_d_loss(d_real, d_fake, label_smooth=label_smooth)
                 Ld.backward()
                 opt_d.step()
                 m_gd.add(Ld.item())
