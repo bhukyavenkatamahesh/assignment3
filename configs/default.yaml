@@ -1,0 +1,42 @@
+# config for AdvSoli training
+# tweak these to run ablations
+
+data:
+  root: data/dsp        # where the .h5 files live after download+unzip
+  num_classes: 11
+  num_subjects: 10
+  seq_len: 32           # pad/truncate to this many frames
+  channels: [0, 1, 2, 3]   # all 4 radar channels
+  img_size: 32
+
+split:
+  fold: 0               # 0 or 1 for 2-fold CV
+  # subjects 0..4 in fold0 train / 5..9 test, swapped in fold1
+
+train:
+  batch_size: 16
+  epochs: 60
+  lr: 0.0003
+  weight_decay: 0.0001
+  optimizer: adam
+  device: auto          # auto = mps if available else cpu
+  seed: 7
+
+# loss weights, set 0 to ablate a component
+loss:
+  cls: 1.0
+  subj_adv: 0.3         # DANN strength
+  gan: 0.2              # cGAN augmentation strength
+  pgd: 0.1              # adversarial robustness strength
+
+adversarial:
+  pgd_eps: 0.03
+  pgd_alpha: 0.01
+  pgd_iters: 3
+  fine_grained_classes: [0, 1, 2, 3]   # pinch idx, pinch pinky, finger slider, finger rub
+
+model:
+  enc_channels: [16, 32, 64]
+  gru_hidden: 128
+  feat_dim: 128
+  noise_dim: 64

@@ -1,0 +1,42 @@
+# data and model artifacts
+data/
+checkpoints/
+runs/
+*.h5
+*.pt
+*.pth
+*.ckpt
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# latex build
+report/*.aux
+report/*.log
+report/*.out
+report/*.bbl
+report/*.blg
+report/*.synctex.gz
+report/*.fdb_latexmk
+report/*.fls
+report/*.toc
+
+# misc
+*.tmp
+notes_local.md
+.claude/
+
