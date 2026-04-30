@@ -1,18 +1,32 @@
 # Report build instructions
 
-`main.tex` is a plain `article`-class single-column LaTeX document
-(matches the style of my Assignment 1 report). No special class files
-needed. To compile:
+`main.tex` follows the **CVPR 2024 author kit** template. To compile,
+drop `cvpr.sty` and `ieeenat_fullname.bst` (from the kit) into this
+folder, then:
 
 ```bash
 pdflatex main
-pdflatex main     # second pass for table/figure references
+bibtex main
+pdflatex main
+pdflatex main
 ```
 
-The figures referenced in the `.tex`
-(`figs/curves_fold0.pdf`, `figs/perclass_bar.pdf`, `figs/confusion.pdf`)
-are produced by:
+## Easiest way: Overleaf
 
+1. Go to [overleaf.com](https://overleaf.com) → **New Project →
+   Templates** → search "CVPR" and pick the official 2024 template.
+2. Replace the example `main.tex` with our `main.tex`.
+3. Upload `refs.bib` and the `figs/` folder (the three PDFs).
+4. Click **Recompile** → download the PDF.
+
+## Files referenced
+
+- `figs/perclass_bar.pdf` -- per-class bar chart
+- `figs/confusion.pdf` -- confusion matrices (backbone vs AdvSoli)
+- `figs/curves_fold0.pdf` -- training curves on fold 0
+- `refs.bib` -- bibliography
+
+The figures are produced by:
 ```bash
 python scripts/plot_results.py    # curves + per-class bar
 python scripts/plot_confusion.py  # confusion matrices
