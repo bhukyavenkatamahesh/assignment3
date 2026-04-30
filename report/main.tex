@@ -1,418 +1,348 @@
-% AdvSoli -- adversarial training for the Soli radar gesture task
-% Drop cvpr.sty + ieeenat_fullname.bst (from the CVPR 2024 author kit) into this
-% folder before compiling.  pdflatex -> bibtex -> pdflatex -> pdflatex.
+\documentclass[11pt]{article}
 
-\documentclass[10pt,twocolumn,letterpaper]{article}
-
-\usepackage[review]{cvpr}
+\usepackage[a4paper, margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
-\usepackage{xcolor}
-\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{hyperref}
 
-\usepackage[pagebackref,breaklinks,colorlinks]{hyperref}
-
-\def\cvprPaperID{****}
-\def\paperID{****}
-\def\confName{ELL784/ELL7286 -- Assignment 3}
-\def\confYear{2026}
-
-\title{AdvSoli: A Compact Adversarial Stack for Cross-Subject and Fine-Grained Gesture Recognition on Soli Radar}
-
+\title{Assignment 3: Adversarial Training and GANs for\\
+Soli Radar Gesture Recognition}
 \author{Venkata Mahesh\\
-Indian Institute of Technology Delhi\\
-{\tt\small jtm252088@iitd.ac.in}\\
-\\
-Course: ELL784 / ELL7286 -- Introduction to Machine Learning, Assignment 3
-}
+Entry No: 2025JTM2088}
+\date{}
 
 \begin{document}
 \maketitle
 
-\begin{abstract}
-The Soli millimeter wave radar produces sparse $32\times32$ range-Doppler
-maps. Two things make the public Soli dataset hard. Four of the eleven
-gestures are tiny finger motions (pinch index, pinch pinky, finger
-slider, finger rub) that look almost identical in the radar view, and
-the radar signature varies a lot between people, so the cross-subject
-setting is much harder than the intra-subject one most papers report.
-We study a compact custom stack we call \textbf{AdvSoli} that puts two
-adversarial signals on top of a small 2D-CNN + Bi-GRU encoder. The first
-is a conditional GAN that synthesizes extra clips for the four hard
-classes. The second is an $\ell_\infty$ Projected Gradient Descent
-attack on the input. We also tried a third signal, a Domain Adversarial
-Neural Network head with a Gradient Reversal Layer, but it hurt
-performance in our small-data setting and we report that as a negative
-finding. On two-fold cross-subject CV over the Soli set (2,750 clips,
-10 subjects, 11 gestures) AdvSoli matches the strong backbone clean
-accuracy (86.6\,\% vs 86.5\,\%) while improving accuracy under a PGD
-attack with $\epsilon{=}0.03$ from 2.4\,\% to 21.9\,\% (about 9 times).
-Each component is also useful by itself: cGAN augmentation alone gives
-the largest fine-grained gain (+1.3 pp), PGD alone gives the largest
-overall accuracy gain (+1.9 pp). All loss functions, the GRL, the PGD
-attack and the GAN training loop are written from scratch in PyTorch.
-The full stack has 1.6M parameters and trains in about two hours on
-Apple Silicon (MPS).
-\end{abstract}
+\section*{Introduction}
 
-%-------------------------------------------------------------------------
-\section{Introduction}
-\label{sec:intro}
-
-Project Soli~\cite{lien2016soli} is a 60\,GHz millimeter wave radar
-designed to sense fine motion at very short range. The output is a
-sequence of range-Doppler maps (RDMs), each of size $32\times32$, captured
-across four receiver channels at roughly 40\,Hz. Compared to RGB it is
-much more robust to lighting, occlusion and privacy concerns, and unlike
-depth or optical flow it consumes only milliwatts. The downside is that
-the input is very sparse: most pixels are background, the signal is one
-or two flickering blobs, and small adjustments of the hand can change
-the spectrum visibly.
-
-The original deep Soli work~\cite{wang2016interacting} reported strong
-recognition for large gestures like push, pull, swipe and palm tilt, but
-\emph{poor} performance on the four fine-grained classes where two
-fingers move with very small displacement. The sensor is the same for
-everybody, so one might expect that a stronger network would close the
-gap, but every public follow up has had to deal with two intertwined
-issues. (i) The fine-grained classes have small intra-class variation
-and large between-class confusion at the same time. (ii) The radar
-signature is shaped by the user's hand size, dominant finger, posture
-and timing, so a model trained on one set of subjects ends up overfitting
-to the surface of those subjects rather than learning the underlying
-motion pattern.
-
-We attack both at once with a compact adversarial stack on top of a small
-custom encoder. AdvSoli combines:
+In this assignment, I worked on hand gesture recognition using the Soli
+millimeter wave radar dataset. The task had two goals:
 \begin{itemize}
-\setlength\itemsep{1pt}
-\item a conditional GAN (cGAN) that synthesizes extra range-Doppler
-clips for the four fine-grained classes; the synthesized clips are
-recycled into the classifier as augmentation,
-\item a Projected Gradient Descent (PGD) input attack~\cite{madry2018towards}
-applied to every batch, with a separate adversarial classification loss.
+\item Improve recognition for the four fine-grained gestures
+(pinch index, pinch pinky, finger slider, finger rub).
+\item Improve cross-subject generalization using two-fold subject
+cross-validation.
 \end{itemize}
 
-We also tried a third signal, a subject discriminator behind a Gradient
-Reversal Layer in the spirit of DANN~\cite{ganin2015dann}. The hope was
-that pushing the encoder towards a subject-invariant representation
-would help the cross-subject task. It did not. Across both folds, adding
-DANN reduced cross-subject accuracy by about a point and dropped
-fine-grained accuracy by 2.5 points. We report this as a negative
-finding and discuss why we think it happens in
-Section~\ref{sec:exp}.
+The model was trained from scratch with adversarial training and a GAN.
+No pretrained networks were used. All loss functions, the Gradient
+Reversal Layer and the PGD attack were implemented manually.
 
-Our contributions are: a small custom encoder + adversarial stack for
-the Soli range-Doppler data with no pretrained components, written from
-scratch; a two-fold subject cross-validation study on the public
-10-subject Soli set, with an ablation showing that cGAN and PGD address
-\emph{different} failure modes (fine-grained vs cross-subject), and that
-the unified two-component model preserves clean accuracy while improving
-adversarial robustness by roughly 9$\times$; and a negative result on
-DANN in this small-data regime, with an analysis pointing at the small
-number of training subjects (5 per fold) as the likely cause.
+I called my final model \textbf{AdvSoli}. It is a small custom encoder
+on top of which two adversarial signals are applied: a conditional GAN
+(cGAN) for fine-grained augmentation, and a Projected Gradient Descent
+(PGD) attack on the input. I also tried a third signal (DANN with
+Gradient Reversal Layer), but it did not help in this small dataset
+setting, so I dropped it from the final model.
 
-%-------------------------------------------------------------------------
-\section{Related Work}
-\label{sec:related}
+\section{Part 1: Approach}
 
-\paragraph{Radar gesture recognition.} The original Soli release
-\cite{wang2016interacting} introduced a 3D CNN + LSTM classifier and
-reported about 87\,\% intra-subject accuracy across 11 gestures, with
-the four fine-grained classes well below that mean. RadarNet
-\cite{hayashi2021radarnet} proposed an efficient on-device model for a
-similar sensor. Spiking nets~\cite{tsang2021spiking} explore a much
-smaller power envelope. The cross-subject setting receives less
-attention than the intra-subject one in all of these works.
+\subsection{Why Adversarial Training and GAN}
 
-\paragraph{Domain adversarial training.} DANN~\cite{ganin2015dann}
-introduced the Gradient Reversal Layer, which makes a feature extractor
-predict-resistant to a categorical nuisance variable like subject id. We
-tried it for the cross-subject task but found it harmful in our setting
-(Section~\ref{sec:exp}).
+The Soli range-Doppler maps are very sparse $32\times32$ images.
+Standard CNN methods from the visual domain do not work well because:
+\begin{itemize}
+\item Most pixels are background; the gesture appears as one or two
+small blobs.
+\item The fine-grained gestures look almost identical in the radar view.
+\item The radar signature changes a lot between people.
+\end{itemize}
 
-\paragraph{GANs for augmentation.} Conditional GANs~\cite{mirza2014cgan,
-goodfellow2014gan} can synthesize labelled samples and are a standard
-tool for class imbalance. We use a deliberately small design: the
-generator and discriminator are both 3D ConvNets with under 0.5M
-parameters, since the goal is augmentation, not photo-realistic
-synthesis.
+To handle these, I used three ideas:
+\begin{itemize}
+\item \textbf{cGAN augmentation}: synthesize extra clips for the four
+hard classes so the classifier has more training data for them.
+\item \textbf{PGD adversarial training}: train the encoder to be
+robust against small input perturbations. This acts as a strong
+regularizer and helps generalization.
+\item \textbf{DANN (tried but dropped)}: a subject discriminator with
+Gradient Reversal Layer to make the encoder ignore subject identity.
+This was the natural idea for cross-subject generalization but did not
+work in my setting.
+\end{itemize}
 
-\paragraph{Adversarial robustness.} The PGD attack~\cite{madry2018towards}
-is the standard tool for adversarial training. We use a tiny radius and
-only two iterations per training step, since on Soli the input range is
-already $[0,1]$ and even one bit of perturbation matters.
+\subsection{Encoder + Classifier}
 
-%-------------------------------------------------------------------------
-\section{Method}
-\label{sec:method}
+I built a small custom encoder from scratch with the following structure:
+\begin{itemize}
+\item \textbf{Per-frame 2D CNN}: 3 convolutional blocks (16, 32, 64
+channels), each with $3\times3$ kernels, batch normalization, leaky
+ReLU and $2\times2$ max pool. Spatial size goes from $32 \to 4$.
+\item \textbf{Bidirectional GRU}: takes the flattened per-frame
+features (1024-dim) and outputs hidden states with 128 units in each
+direction.
+\item \textbf{Temporal mean pool} of the GRU outputs.
+\item \textbf{Linear projection} to a 128-dim feature.
+\item \textbf{Classifier head}: small MLP (128 $\to$ 64 $\to$ 11) with
+dropout 0.3.
+\end{itemize}
 
-Figure~\ref{fig:arch} sketches the full pipeline. We treat each Soli
-clip as a tensor $x \in \mathbb{R}^{T\times C\times H\times W}$ with
-$T{=}32$, $C{=}4$ (channels of the radar antenna array) and
-$H{=}W{=}32$. We pad or center crop the temporal axis to keep $T$
-fixed. All RDMs are min-max normalized to $[0,1]$ per clip.
+I picked 2D-CNN per frame + GRU instead of full 3D CNN because the
+RDM is sparse, and a 2D CNN can isolate the small motion blobs per
+frame, then the GRU ties their trajectory across time.
 
-\subsection{Encoder}
-\label{sec:enc}
-The encoder $E$ first applies the same 2D CNN to every frame
-independently. We use three convolutional blocks (16, 32, 64 channels)
-with $3\times3$ kernels, batch normalization, leaky ReLU and a
-$2\times2$ max pool, which reduces the spatial dimension from
-$32\to4$. The flattened per-frame feature ($64\cdot4\cdot4 = 1024$) is
-then read out by a bidirectional GRU with hidden size 128. We take the
-mean over time of the GRU output and map it to a 128 dimensional
-feature with a linear+leaky-ReLU head.
+\subsection{Conditional GAN}
 
-We picked this 2D-CNN-per-frame + GRU split rather than a full 3D CNN
-for two reasons. First, the RDM is sparse and most of its content sits
-in a few pixels, so a per-frame 2D CNN can isolate those blobs cleanly.
-Second, gesture identity in Soli is mostly about the \emph{trajectory}
-of those blobs over time, which the GRU handles well. In our
-experiments this split converged faster and ended slightly higher than
-a 3D CNN of similar parameter count.
+The generator and discriminator are both small 3D ConvNets:
+\begin{itemize}
+\item \textbf{Generator}: takes a 64-dim Gaussian noise vector and a
+class embedding, projects to a $4\times4\times4$ feature volume, then
+3 ConvTranspose3d blocks scale up to $32\times32\times32$, followed by
+a $1\times1\times1$ projection to 4 channels and a sigmoid.
+\item \textbf{Discriminator}: 3D CNN on the clip, concatenated with
+the class embedding, followed by a linear head (real / fake score).
+\end{itemize}
 
-\subsection{Conditional GAN for Fine-Grained Augmentation}
-\label{sec:gan}
-We attach a small conditional GAN that only generates clips for the
-four fine-grained classes. The generator $G$ takes a 64-dim Gaussian
-noise vector $z$ and a class embedding $e_y$, projects them to a
-$4\times4\times4$ feature volume, and applies three 3D ConvTranspose
-blocks with batch norm and leaky ReLU to reach the target
-$32\times32\times32$ shape, before a $1\times1\times1$ projection to
-four channels and a sigmoid. The conditional discriminator $D_{rf}$ is
-symmetric: a 3D CNN on the clip, concatenated with the class embedding
-before a linear head.
+The GAN is conditional on class label and only generates the four hard
+classes. I used a non-saturating GAN loss with one-sided label
+smoothing (real $= 0.9$). I update the discriminator every 2 batches
+to keep the GAN balanced, since otherwise the discriminator wins very
+fast on this small dataset.
 
-The two networks are trained with a non-saturating GAN loss. We apply
-one-sided label smoothing on the real targets~\cite{salimans2016},
-$y_{\text{real}} = 0.9$ and $y_{\text{fake}} = 0$. We update the
-discriminator every two batches, which we found stabilizes training on
-this small dataset.
-
-\paragraph{Coupling to the classifier.} After a short warmup of
-$\lceil E/6 \rceil$ epochs we draw a fresh batch of fakes
-$\tilde{x} = G(z, \tilde{y})$ at every step and feed it through the
-encoder + classifier together with the real batch. The fakes have the
-generator parameters detached with respect to the classifier loss, so
-the encoder simply sees extra synthetic fine-grained data without back
-propagating into $G$.
+After a short warmup of 5 epochs, the generated fakes are fed through
+the encoder and classifier as additional training samples for the
+hard classes (with the generator detached, so the GAN loss does not
+flow back from the classifier).
 
 \subsection{PGD Adversarial Training}
-\label{sec:pgd}
-At every step we additionally compute an $\ell_\infty$ PGD attack on
-the input,
+
+For each batch, I generate an $\ell_\infty$ adversarial example:
 \[
-x^* = \Pi_{\|x^* - x\|_\infty \le \epsilon}\,
-\Big(x^* + \alpha\, \mathrm{sign}\, \nabla_{x^*} \mathcal{L}(C(E(x^*)), y) \Big),
+x^* = \Pi_{\|x^* - x\|_\infty \le \epsilon}\Big(x^* + \alpha \cdot
+\mathrm{sign}(\nabla_{x^*} L(C(E(x^*)), y))\Big)
 \]
-with $\epsilon{=}0.03$, $\alpha{=}0.01$ and 2 iterations, started from
-a uniform $\epsilon$-ball around $x$. We then add a separate
-classification loss on $x^*$. The cost of the extra forward and
-backward passes is small because we only do two iterations.
+with $\epsilon = 0.03$, $\alpha = 0.01$, and 2 iterations starting from
+a random point inside the $\epsilon$-ball. The classifier is trained on
+both clean and adversarial inputs.
 
-\subsection{Subject Discriminator with Gradient Reversal (Negative Result)}
-\label{sec:dann}
-We initially included a third adversarial signal, a small subject head
-$D_s$ behind a Gradient Reversal Layer~\cite{ganin2015dann}. The
-schedule is the original DANN one,
-$\alpha(p) = \frac{2}{1+\exp(-\gamma p)} - 1$ with $\gamma{=}10$ and
-$p$ the linear training progress in $[0,1]$.
+\subsection{DANN Subject Discriminator (Negative Result)}
 
-In our final two-component model we drop this head, because in our
-two-fold setting (only five training subjects per fold) it consistently
-underperformed the same backbone without it (see
-Table~\ref{tab:abl}). We discuss why in Section~\ref{sec:exp}.
-
-\subsection{Combined Objective}
-\label{sec:loss}
-The total per-batch loss for AdvSoli (excluding the GAN updates that
-are taken on their own optimizer) is
+I also tried the DANN approach: a small subject head behind a Gradient
+Reversal Layer. The GRL is identity in the forward pass and multiplies
+the gradient by $-\alpha$ in the backward pass. The schedule is the
+original DANN one,
 \[
-\mathcal{L} = \mathcal{L}_{cls} \;+\; \lambda_p\,\mathcal{L}_{pgd} \;+\; \lambda_g\,\mathcal{L}_{aug},
+\alpha(p) = \frac{2}{1+\exp(-\gamma p)} - 1, \quad \gamma = 10.
 \]
-with $\lambda_p{=}0.1$ and $\lambda_g{=}0.2$. $\mathcal{L}_{cls}$ and
-$\mathcal{L}_{pgd}$ are cross entropy on the real and adversarial inputs
-respectively. $\mathcal{L}_{aug}$ is cross entropy of the classifier on
-the generated fakes against their conditional labels.
+I expected this to improve cross-subject generalization. It did not.
+I report this as a negative finding in Section 3.
 
-\begin{figure}[t]
-  \centering
-  \fbox{\parbox{0.92\linewidth}{\centering\rule{0pt}{2.4cm}
-       \texttt{report/figs/arch.pdf} (architecture overview)}}
-  \caption{AdvSoli pipeline. The shared 2D-CNN+GRU encoder feeds the
-  gesture classifier. During training the input is also perturbed by a
-  PGD attack and the classifier sees synthetic fine-grained clips drawn
-  from a small conditional GAN. Only the encoder and classifier are
-  kept at test time.}
-  \label{fig:arch}
-\end{figure}
+\subsection{Combined Loss}
 
-%-------------------------------------------------------------------------
-\section{Experiments}
-\label{sec:exp}
+The final AdvSoli loss is:
+\[
+\mathcal{L} = \mathcal{L}_{\text{cls}} + \lambda_p \mathcal{L}_{\text{pgd}}
++ \lambda_g \mathcal{L}_{\text{aug}}
+\]
+with $\lambda_p = 0.1$, $\lambda_g = 0.2$. The GAN itself (G and D)
+has its own optimizer.
 
-\subsection{Setup}
-We use the publicly released Soli range-Doppler files
-\cite{wang2016interacting} covering 11 gesture classes and 10 subjects.
-Each gesture has 25 instances per subject, for a total of 2,750 clips.
-We adopt two-fold cross validation over subjects: in fold 0 the model
-is trained on subjects $\{2,3,5,6,8\}$ and tested on
-$\{9,10,11,12,13\}$, in fold 1 the split is swapped. We report mean and
-best-of-fold test accuracy across the two folds.
+\section{Part 2: Experiments}
 
-We train each model for 30 epochs with Adam
-($\text{lr}{=}3\!\times\!10^{-4}$, weight decay $10^{-4}$) and batch
-size 16. The total parameter count is 1.6M. All training is done in
-PyTorch on Apple Silicon (MPS). A full ablation sweep ($5{\times}2$
-runs of 30 epochs each, plus the proposed two-component model on both
-folds) takes about three hours wall clock on a MacBook Air.
+\subsection{Dataset}
 
-\subsection{Main results and ablation}
-Table~\ref{tab:abl} reports the cross-subject accuracy of every variant,
-the fine-grained subset accuracy, and the accuracy under a 10-step
-$\ell_\infty$ PGD attack with $\epsilon{=}0.03$ on the test set.
+I used the public Soli range-Doppler dataset:
+\begin{itemize}
+\item 11 gestures.
+\item 10 subjects (sessions 2, 3, 5, 6, 8, 9, 10, 11, 12, 13).
+\item 25 instances per (gesture, subject), total 2,750 clips.
+\item Each clip is a sequence of $32\times32$ RDM frames across 4
+radar channels (HDF5 format).
+\end{itemize}
+
+Each clip was padded or center-cropped to 32 frames and min-max
+normalized to $[0, 1]$.
+
+For two-fold cross-validation:
+\begin{itemize}
+\item \textbf{Fold 0}: train on subjects $\{2, 3, 5, 6, 8\}$, test on
+$\{9, 10, 11, 12, 13\}$.
+\item \textbf{Fold 1}: swap.
+\end{itemize}
+
+\subsection{Training Setup}
+
+\begin{itemize}
+\item Optimizer: Adam, learning rate $3 \times 10^{-4}$, weight decay
+$10^{-4}$.
+\item Batch size: 16.
+\item Epochs: 30.
+\item Total parameters: 1.6M.
+\item Hardware: MacBook Air (Apple Silicon, MPS backend).
+\item Per-fold training time: 12 - 16 minutes.
+\end{itemize}
+
+\subsection{Ablation Study}
+
+I trained 6 variants on both folds. Each variant turns one or more
+adversarial signals on or off. Results are mean over the two folds.
 
 \begin{table}[h]
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
 \begin{tabular}{lccc}
 \toprule
-Variant & overall & fine-grained & PGD-robust \\
+Variant & Overall acc (\%) & Fine-grained acc (\%) & PGD-robust (\%) \\
 \midrule
-Backbone (no adv.)        & 86.5 & 80.9 & 2.4 \\
-+ DANN only               & 85.6 & 78.4 & --- \\
-+ cGAN only               & 86.6 & \textbf{82.2} & 0.1 \\
-+ PGD only                & \textbf{88.4} & 81.4 & \textbf{27.3} \\
-\midrule
-\textbf{AdvSoli (cGAN+PGD)}        & 86.6 & 80.3 & \textbf{21.9} \\
-all 3 (cGAN+PGD+DANN)     & 86.4 & 79.4 & 18.5 \\
+Backbone (no adv.) & 86.5 & 80.9 & 2.4 \\
++ DANN only & 85.6 & 78.4 & --- \\
++ cGAN only & 86.6 & \textbf{82.2} & 0.1 \\
++ PGD only & \textbf{88.4} & 81.4 & \textbf{27.3} \\
+\textbf{AdvSoli (cGAN + PGD)} & 86.6 & 80.3 & \textbf{21.9} \\
+All three (cGAN + PGD + DANN) & 86.4 & 79.4 & 18.5 \\
 \bottomrule
 \end{tabular}
-\caption{Cross-subject accuracy (\%), mean over the two folds.
-PGD-robust is test accuracy under a 10-iteration $\ell_\infty$ attack
-with $\epsilon{=}0.03$. Each adversarial signal helps a different axis.
-Adding DANN reduces accuracy in our setting, so AdvSoli drops it.}
+\caption{Cross-subject ablation results. PGD-robust is accuracy under
+a 10-step $\ell_\infty$ PGD attack with $\epsilon = 0.03$.}
 \label{tab:abl}
 \end{table}
 
-The backbone is already strong. A 2D-CNN per frame + Bi-GRU at 1.6M
-parameters reaches 86.5\,\% mean cross-subject accuracy and 80.9\,\%
-on the fine-grained subset, which leaves little room for any single
-component to claim a huge headline number on clean accuracy.
+\subsection{Per-Class Breakdown (Fold 0)}
 
-Each individual signal helps a different failure mode. cGAN alone gives
-the best fine-grained mean (+1.3 pp), the gain we expected from
-class-conditional augmentation. PGD alone gives the best overall
-accuracy (+1.9 pp), which we read as the standard regularizing effect
-of adversarial training. Both effects show up on both folds.
-
-The two-component AdvSoli buys robustness at no clean-accuracy cost.
-Going from backbone to AdvSoli, the clean accuracy stays the same
-(86.5 to 86.6) but accuracy under a PGD attack jumps from 2.4\,\% to
-21.9\,\%, about 9 times higher. The encoder learnt features that
-survive small input perturbations.
-
-The components do not strictly compose. Adding cGAN on top of
-PGD-trained features brings overall accuracy back down to baseline. We
-think the reason is that PGD already enforces input-robust features,
-and the synthetic GAN clips look like an additional perturbation rather
-than a useful new mode. The fine-grained mean of AdvSoli is therefore
-in between cGAN-alone and PGD-alone. We chose to keep both signals for
-two reasons. The assignment specifies adversarial training and GANs, so
-we want both in the final model. And keeping the same clean accuracy
-while gaining a 9$\times$ robustness boost is a useful trade-off for a
-gesture recognizer where noisy or adversarial inputs are realistic.
-
-DANN hurts in this regime. With only five training subjects per fold,
-the GRL cannot reliably push the encoder towards a subject-invariant
-representation. The subject head's loss stays around $\log K$
-($K{=}10$) and the gradient reversal injects mostly noise into the
-encoder. We see this both in the \emph{+DANN only} row of
-Table~\ref{tab:abl} and in the all-three row, which is consistently
-worse than AdvSoli.
-
-\subsection{Per-class breakdown}
-Figure~\ref{fig:perclass} shows per-class accuracy on fold 0 for the
-backbone and AdvSoli. AdvSoli improves the two pinch classes
-(pinch index 67$\to$86, pinch pinky 81$\to$87) but loses on finger
-slider (90$\to$67) and slightly on finger rub (82$\to$76). The
-confusion matrix in Figure~\ref{fig:cm} clarifies why: the cGAN gives
-the encoder a lot of synthetic pinch clips, and some real finger
-slider samples now drift into the pinch index region. This is a known
-failure mode of small conditional GANs, where the generator collapses
-onto a few typical patterns per class. A more diverse generator, or a
-per-class augmentation budget, would probably help. The easier classes
-(push, pull, fast swipe, palm tilt, circle, palm hold) all sit at
-$\geq$ 0.97 for both models, so AdvSoli does not damage them.
+Figure \ref{fig:perclass} shows per-class accuracy on fold 0 for the
+backbone and AdvSoli.
 
 \begin{figure}[h]
-  \centering
-  \includegraphics[width=\linewidth]{figs/perclass_bar.pdf}
-  \caption{Per-class test accuracy on fold 0. Orange columns mark the
-  four fine-grained classes that the cGAN augmentation targets.
-  AdvSoli helps the two pinches and slightly hurts the two finger
-  classes. Easy gestures are unchanged.}
-  \label{fig:perclass}
+\centering
+\includegraphics[width=0.9\linewidth]{figs/perclass_bar.pdf}
+\caption{Per-class test accuracy on fold 0. Orange columns are the
+fine-grained classes targeted by the cGAN augmentation.}
+\label{fig:perclass}
 \end{figure}
 
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=0.92\linewidth]{figs/confusion.pdf}
-  \caption{Row-normalized confusion matrices on fold 0. The biggest
-  remaining error after AdvSoli is finger\_slider $\to$ pinch\_index
-  (0.30 vs 0.06 for the backbone), which is the cost of using cGAN
-  augmentation on this small dataset.}
-  \label{fig:cm}
-\end{figure*}
+Observations:
+\begin{itemize}
+\item AdvSoli improves \textbf{pinch index} (0.67 $\to$ 0.86) and
+\textbf{pinch pinky} (0.81 $\to$ 0.87) clearly.
+\item AdvSoli loses on \textbf{finger slider} (0.90 $\to$ 0.67) and
+slightly on \textbf{finger rub} (0.82 $\to$ 0.76).
+\item Easy gestures (push, pull, fast swipe, palm tilt, circle, palm
+hold) all stay above 0.97.
+\end{itemize}
 
-\subsection{Training dynamics}
-Figure~\ref{fig:curves} plots test accuracy against epoch for each
-variant on fold 0. The PGD-only run is more stable and reaches the
-highest plateau. The 3-way model and the +DANN run are the noisiest,
-which lines up with the negative DANN result.
+The confusion matrix in Figure \ref{fig:cm} shows that the cGAN learns
+strong patterns for the pinch classes, and some real finger-slider
+clips drift into the pinch-index region. This is a known mode-collapse
+behaviour of small conditional GANs.
 
 \begin{figure}[h]
-  \centering
-  \includegraphics[width=\linewidth]{figs/curves_fold0.pdf}
-  \caption{Test accuracy versus epoch on fold 0 for each ablation
-  variant. PGD-only is the most stable. DANN-containing variants
-  oscillate the most.}
-  \label{fig:curves}
+\centering
+\includegraphics[width=\linewidth]{figs/confusion.pdf}
+\caption{Row-normalized confusion matrices on fold 0.}
+\label{fig:cm}
 \end{figure}
 
-\subsection{Why we still keep the cGAN}
-A reasonable reading of Table~\ref{tab:abl} would be ``just use +PGD''.
-We chose AdvSoli (cGAN+PGD) for three reasons. The assignment asks for
-adversarial training and GANs, so we want both signals in the final
-model. The cGAN keeps the encoder honest about the structure of the
-pinch classes (the per-class plot makes this very visible). And keeping
-86.6\,\% clean accuracy while gaining 9$\times$ PGD robustness is the
-kind of trade-off we would actually want in a deployed gesture
-recognizer where noisy or adversarial inputs are realistic.
+\subsection{Training Curves}
 
-%-------------------------------------------------------------------------
-\section{Conclusion}
+Figure \ref{fig:curves} plots test accuracy versus epoch for each
+variant. PGD-only is the most stable. DANN-containing runs oscillate.
 
-We described AdvSoli, a small custom encoder trained jointly with two
-adversarial signals: a conditional GAN for fine-grained augmentation
-and a PGD input perturbation. The whole stack stays under 1.6M
-parameters, trains on a laptop in a couple of hours, and on the
-two-fold cross-subject Soli benchmark it preserves the strong backbone
-accuracy while improving adversarial robustness by roughly 9$\times$.
-Our ablations also show that on this small dataset a DANN subject
-discriminator does not help. The implementation, configs, splits and
-the final checkpoint are released at the GitHub repository:
-\url{https://github.com/bhukyavenkatamahesh/assignment3}.
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{figs/curves_fold0.pdf}
+\caption{Test accuracy versus epoch on fold 0 for each ablation
+variant.}
+\label{fig:curves}
+\end{figure}
 
-%-------------------------------------------------------------------------
+\section{Part 3: Discussion}
 
-{\small
-\bibliographystyle{ieeenat_fullname}
-\bibliography{refs}
-}
+\subsection{What Worked}
+
+\begin{itemize}
+\item \textbf{PGD adversarial training} was the single most useful
+component. Overall accuracy improved by 1.9 percentage points and
+robustness under a PGD attack went from 2.4\% to 27.3\%.
+\item \textbf{cGAN augmentation} was the most useful for fine-grained
+accuracy (+1.3 points). The pinch classes especially benefited.
+\item The combined \textbf{AdvSoli (cGAN + PGD)} model preserves
+clean accuracy and gives 21.9\% PGD-robust accuracy, which is around
+9 times better than the backbone.
+\end{itemize}
+
+\subsection{What Did Not Work: DANN}
+
+DANN consistently hurt accuracy in my experiments. I think the reason
+is:
+\begin{itemize}
+\item Each fold has only 5 training subjects.
+\item The subject discriminator has very little information to learn
+from. Its loss stays close to $\log(10) \approx 2.3$, near random.
+\item The GRL feeds mostly noise back into the encoder gradients.
+\end{itemize}
+
+DANN typically needs many source domains to work well. In my setting
+the assumption is violated.
+
+\subsection{Why the Components Do Not Compose Cleanly}
+
+Adding cGAN on top of a PGD-trained model brings overall accuracy back
+to baseline. My interpretation:
+\begin{itemize}
+\item PGD already pushes the encoder towards input-robust features.
+\item Synthetic GAN clips look like another input perturbation rather
+than a useful new mode.
+\item The cGAN biases the encoder slightly towards typical pinch
+patterns, hurting other fine-grained classes.
+\end{itemize}
+
+I still ship cGAN + PGD as the AdvSoli model because:
+\begin{itemize}
+\item The assignment requires both adversarial training and GANs.
+\item Robustness improves 9 times with no clean-accuracy cost.
+\item The cGAN noticeably helps the two pinch classes.
+\end{itemize}
+
+\section*{Conclusion}
+
+In this assignment, I built AdvSoli, a small custom adversarial stack
+for the Soli radar gesture task. It uses a 2D-CNN + Bi-GRU encoder
+trained jointly with:
+\begin{itemize}
+\item a conditional GAN that synthesizes extra clips for the four
+fine-grained classes,
+\item and a PGD adversarial perturbation on the input.
+\end{itemize}
+
+On two-fold cross-subject CV, the model maintains the strong backbone
+clean accuracy (86.6\% vs 86.5\%) and improves adversarial robustness
+by roughly 9 times.
+
+I also reported a negative finding on DANN: in a setting with only
+five training subjects per fold, the subject discriminator does not
+help and actually hurts performance. The honest ablation table makes
+clear which adversarial signal contributes to which axis (cGAN for
+fine-grained, PGD for cross-subject and robustness).
+
+\section*{Code and Model Links}
+
+\noindent\textbf{GitHub repository:}\\
+\url{https://github.com/venkatamahesh/assignment3}
+
+\medskip
+\noindent\textbf{Final model checkpoints (Hugging Face):}\\
+\url{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}
+
+\medskip
+\noindent The repository contains:
+\begin{itemize}
+\item \texttt{src/} -- data loader, encoder, GAN, losses, GRL, PGD
+attack, training and evaluation code (all from scratch in PyTorch).
+\item \texttt{configs/} -- the YAML config and the 2-fold subject
+split.
+\item \texttt{scripts/} -- data download, ablation runner, AdvSoli
+runner, plotting scripts.
+\item \texttt{checkpoints/} -- 12 saved checkpoints (6 variants $\times$
+2 folds).
+\item \texttt{report/} -- this report and the figures.
+\end{itemize}
+
+\medskip
+\noindent See \texttt{README.md} for full instructions on how to
+download the data, train, and evaluate.
 
 \end{document}
