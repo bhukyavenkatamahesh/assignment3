@@ -1,10 +1,13 @@
 % AdvSoli -- adversarial training for the Soli radar gesture task
 % CVPR template (cvpr.sty + ieeenat_fullname.bst from the CVPR author kit).
 % Build:  pdflatex -> bibtex -> pdflatex -> pdflatex.
+%
+% Final / camera-ready mode (no review flag) -- author info shown,
+% no line numbers, no "Anonymous", no "Paper ID".
 
 \documentclass[10pt,twocolumn,letterpaper]{article}
 
-\usepackage[review]{cvpr}
+\usepackage{cvpr}              % final mode (omit [review])
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -14,16 +17,14 @@
 
 \usepackage[pagebackref,breaklinks,colorlinks]{hyperref}
 
-\def\cvprPaperID{****}
-\def\paperID{****}
 \def\confName{ELL784/ELL7286 -- Assignment 3}
 \def\confYear{2026}
 
 \title{AdvSoli: A Compact Adversarial Stack for Cross-Subject and Fine-Grained Gesture Recognition on Soli Radar}
 
-\author{Venkata Mahesh\\
-Indian Institute of Technology Delhi\\
+\author{Venkata Mahesh Bhukya\\
 Entry No: 2025JTM2088\\
+Indian Institute of Technology Delhi\\
 {\tt\small jtm252088@iitd.ac.in}\\
 \\
 Course: ELL784 / ELL7286 -- Introduction to Machine Learning, Assignment 3
@@ -105,15 +106,24 @@ fine-grained accuracy by 2.5 points. We report this as a negative
 finding and discuss why we think it happens in
 Section~\ref{sec:exp}.
 
-Our contributions are: a small custom encoder + adversarial stack for
-the Soli range-Doppler data with no pretrained components, written from
-scratch; a two-fold subject cross-validation study on the public
-10-subject Soli set, with an ablation showing that cGAN and PGD address
-\emph{different} failure modes (fine-grained vs cross-subject), and that
-the unified two-component model preserves clean accuracy while improving
-adversarial robustness by roughly 9$\times$; and a negative result on
-DANN in this small-data regime, with an analysis pointing at the small
-number of training subjects (5 per fold) as the likely cause.
+Our contributions are:
+\begin{enumerate}
+\setlength\itemsep{1pt}
+\item A small custom encoder + adversarial stack for the Soli
+range-Doppler data with no pretrained components, written from scratch.
+\item A two-fold subject cross-validation study on the public
+10-subject Soli set, with an ablation showing that cGAN and PGD
+address \emph{different} failure modes (fine-grained vs cross-subject),
+and that the unified two-component model preserves clean accuracy while
+improving adversarial robustness by roughly 9$\times$.
+\item A negative result on DANN in this small-data regime, with an
+analysis pointing at the small number of training subjects (5 per fold)
+as the likely cause.
+\end{enumerate}
+
+Code, configs and the trained checkpoints are released at
+\url{https://github.com/venkatamahesh/assignment3} and
+\url{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}.
 
 %-------------------------------------------------------------------------
 \section{Related Work}
@@ -205,10 +215,11 @@ propagating into $G$.
 \label{sec:pgd}
 At every step we additionally compute an $\ell_\infty$ PGD attack on
 the input,
-\[
+\begin{equation}
 x^* = \Pi_{\|x^* - x\|_\infty \le \epsilon}\,
 \Big(x^* + \alpha\, \mathrm{sign}\, \nabla_{x^*} \mathcal{L}(C(E(x^*)), y) \Big),
-\]
+\label{eq:pgd}
+\end{equation}
 with $\epsilon{=}0.03$, $\alpha{=}0.01$ and 2 iterations, started from
 a uniform $\epsilon$-ball around $x$. We then add a separate
 classification loss on $x^*$. The cost of the extra forward and
@@ -231,9 +242,10 @@ Table~\ref{tab:abl}). We discuss why in Section~\ref{sec:exp}.
 \label{sec:loss}
 The total per-batch loss for AdvSoli (excluding the GAN updates that
 are taken on their own optimizer) is
-\[
+\begin{equation}
 \mathcal{L} = \mathcal{L}_{cls} \;+\; \lambda_p\,\mathcal{L}_{pgd} \;+\; \lambda_g\,\mathcal{L}_{aug},
-\]
+\label{eq:total}
+\end{equation}
 with $\lambda_p{=}0.1$ and $\lambda_g{=}0.2$. $\mathcal{L}_{cls}$ and
 $\mathcal{L}_{pgd}$ are cross entropy on the real and adversarial inputs
 respectively. $\mathcal{L}_{aug}$ is cross entropy of the classifier on
@@ -243,7 +255,7 @@ the generated fakes against their conditional labels.
 \section{Experiments}
 \label{sec:exp}
 
-\subsection{Setup}
+\subsection{Experimental Setup}
 We use the publicly released Soli range-Doppler files
 \cite{wang2016interacting} covering 11 gesture classes and 10 subjects.
 Each gesture has 25 instances per subject, for a total of 2,750 clips.
