@@ -121,9 +121,10 @@ analysis pointing at the small number of training subjects (5 per fold)
 as the likely cause.
 \end{enumerate}
 
-Code, configs and the trained checkpoints are released at
-\url{https://github.com/bhukyavenkatamahesh/assignment3} and
-\url{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}.
+Code, configs and trained checkpoints are available at the
+\href{https://github.com/bhukyavenkatamahesh/assignment3}{GitHub repository}
+and the
+\href{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}{Hugging Face checkpoint folder}.
 
 %-------------------------------------------------------------------------
 \section{Related Work}
@@ -164,7 +165,33 @@ We treat each Soli clip as a tensor
 $x \in \mathbb{R}^{T\times C\times H\times W}$ with $T{=}32$, $C{=}4$
 (channels of the radar antenna array) and $H{=}W{=}32$. We pad or
 center crop the temporal axis to keep $T$ fixed. All RDMs are min-max
-normalized to $[0,1]$ per clip.
+normalized to $[0,1]$ per clip. Figure~\ref{fig:arch} summarizes the
+training and inference pipeline.
+
+\begin{figure}[t]
+\centering
+\small
+\setlength{\fboxsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{c}
+\fbox{\parbox{0.86\linewidth}{\centering Soli RDM clip\\
+$T{\times}4{\times}32{\times}32$}}\\[-1pt]
+$\downarrow$\\[-1pt]
+\fbox{\parbox{0.86\linewidth}{\centering Shared encoder\\
+2D CNN per frame + Bi-GRU}}\\[-1pt]
+$\downarrow$\\[-1pt]
+\fbox{\parbox{0.86\linewidth}{\centering Gesture classifier\\
+11 gesture logits}}\\[-1pt]
+$\uparrow$\\[-1pt]
+\fbox{\parbox{0.86\linewidth}{\centering Training-only adversarial signals\\
+PGD perturbs real clips; cGAN injects synthetic fine-grained clips}}
+\end{tabular}
+\caption{AdvSoli architecture. A compact 2D-CNN+Bi-GRU encoder feeds
+the gesture classifier. During training, PGD creates adversarial
+inputs and a conditional GAN supplies additional fine-grained radar
+clips. At test time, only the encoder and classifier are used.}
+\label{fig:arch}
+\end{figure}
 
 \subsection{Encoder}
 \label{sec:enc}
@@ -278,25 +305,26 @@ $\ell_\infty$ PGD attack with $\epsilon{=}0.03$ on the test set.
 
 \begin{table}[h]
 \centering
-\small
-\setlength{\tabcolsep}{4pt}
+\scriptsize
+\setlength{\tabcolsep}{2.4pt}
 \begin{tabular}{lccc}
 \toprule
-Variant & overall & fine-grained & PGD-robust \\
+Variant & overall & fine & PGD-robust \\
 \midrule
 Backbone (no adv.)        & 86.5 & 80.9 & 2.4 \\
 + DANN only               & 85.6 & 78.4 & --- \\
 + cGAN only               & 86.6 & \textbf{82.2} & 0.1 \\
 + PGD only                & \textbf{88.4} & 81.4 & \textbf{27.3} \\
 \midrule
-\textbf{AdvSoli (cGAN+PGD)}        & 86.6 & 80.3 & \textbf{21.9} \\
+\textbf{AdvSoli}        & 86.6 & 80.3 & \textbf{21.9} \\
 all 3 (cGAN+PGD+DANN)     & 86.4 & 79.4 & 18.5 \\
 \bottomrule
 \end{tabular}
 \caption{Cross-subject accuracy (\%), mean over the two folds.
 PGD-robust is test accuracy under a 10-iteration $\ell_\infty$ attack
-with $\epsilon{=}0.03$. Each adversarial signal helps a different axis.
-Adding DANN reduces accuracy in our setting, so AdvSoli drops it.}
+with $\epsilon{=}0.03$; fine denotes the four fine-grained gestures.
+AdvSoli uses cGAN+PGD. Each adversarial signal helps a different axis.
+Higher is better for all metrics.}
 \label{tab:abl}
 \end{table}
 
@@ -400,11 +428,11 @@ recognizer where noisy or adversarial inputs are realistic.
 \label{sec:code}
 
 \noindent\textbf{GitHub repository:}\\
-\url{https://github.com/bhukyavenkatamahesh/assignment3}
+{\scriptsize\href{https://github.com/bhukyavenkatamahesh/assignment3}{\texttt{https://github.com/bhukyavenkatamahesh/assignment3}}}
 
 \medskip
 \noindent\textbf{Final model checkpoints (Hugging Face):}\\
-\url{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}
+{\scriptsize\href{https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints}{\texttt{https://huggingface.co/venkatamahesh/advsoli-soli}}}
 
 \medskip
 \noindent The repository contains the data loader, model, GAN, losses,
@@ -418,8 +446,8 @@ folds). See \texttt{README.md} for run instructions.
 
 We described AdvSoli, a small custom encoder trained jointly with two
 adversarial signals: a conditional GAN for fine-grained augmentation
-and a PGD input perturbation. The whole stack stays under 1.6M
-parameters, trains on a laptop in a couple of hours, and on the
+and a PGD input perturbation. The full model has 1.6M parameters,
+trains within two hours on a laptop, and on the
 two-fold cross-subject Soli benchmark it preserves the strong backbone
 accuracy while improving adversarial robustness by roughly 9$\times$.
 Our ablations also show that on this small dataset a DANN subject
