@@ -138,8 +138,8 @@ the released checkpoints live in `checkpoints/`:
 Each checkpoint stores the encoder, classifier, subject head, generator
 and discriminator state dicts plus the config used to train.
 
-**External model download (Google Drive):**
-[All checkpoints (advsoli, backbone, ablation variants)](https://drive.google.com/drive/folders/1GEa77k0CFr8-449y5f3Idb23L8PGKLDO?usp=sharing)
+**External model download (Hugging Face):**
+[All checkpoints (advsoli, backbone, ablation variants)](https://huggingface.co/venkatamahesh/advsoli-soli/tree/main/checkpoints)
 
 ## Repo layout
 
