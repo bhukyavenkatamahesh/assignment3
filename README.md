@@ -120,7 +120,7 @@ python -m src.eval --ckpt checkpoints/advsoli_fold0_best.pt
 
 Set `--pgd_eps 0` to skip the adversarial robustness eval.
 
-## Pretrained models
+## Trained checkpoints
 
 After running `scripts/run_ablations.py` and `scripts/run_advsoli.py`,
 the released checkpoints live in `checkpoints/`:
@@ -138,11 +138,8 @@ the released checkpoints live in `checkpoints/`:
 Each checkpoint stores the encoder, classifier, subject head, generator
 and discriminator state dicts plus the config used to train.
 
-**External model download (Google Drive / OneDrive / HuggingFace):**
-[advsoli\_fold0\_best.pt + advsoli\_fold1\_best.pt](REPLACE_WITH_LINK)
-
-Upload your `checkpoints/advsoli_fold*.pt` files to a public host and
-replace `REPLACE_WITH_LINK` above before submitting.
+**External model download (Google Drive):**
+[All checkpoints (advsoli, backbone, ablation variants)](https://drive.google.com/drive/folders/1GEa77k0CFr8-449y5f3Idb23L8PGKLDO?usp=sharing)
 
 ## Repo layout
 
