@@ -11,7 +11,7 @@ Two adversarial pieces used in AdvSoli:
    robust to small radar-domain perturbations (Madry et al. 2018).
 """
 import torch
-import torch.nn as nn
+from .losses import cls_loss
 
 
 class _GradReverse(torch.autograd.Function):
@@ -37,7 +37,7 @@ def pgd_attack(forward_fn, x, y, eps=0.03, alpha=0.01, iters=3,
     Returns adversarial x with the same shape as x, detached from the graph.
     """
     if loss_fn is None:
-        loss_fn = nn.CrossEntropyLoss()
+        loss_fn = cls_loss
 
     # random init inside the eps ball
     x_adv = x.detach() + torch.empty_like(x).uniform_(-eps, eps)

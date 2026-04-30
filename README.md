@@ -138,9 +138,11 @@ the released checkpoints live in `checkpoints/`:
 Each checkpoint stores the encoder, classifier, subject head, generator
 and discriminator state dicts plus the config used to train.
 
-The final AdvSoli model (`advsoli_fold0_best.pt`) is also uploaded
-externally; see the link below the report's title once the report is
-finalized.
+**External model download (Google Drive / OneDrive / HuggingFace):**
+[advsoli\_fold0\_best.pt + advsoli\_fold1\_best.pt](REPLACE_WITH_LINK)
+
+Upload your `checkpoints/advsoli_fold*.pt` files to a public host and
+replace `REPLACE_WITH_LINK` above before submitting.
 
 ## Repo layout
 
